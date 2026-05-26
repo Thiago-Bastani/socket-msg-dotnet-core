@@ -7,7 +7,8 @@ public static class ConsoleUI
     private static readonly List<Message> _messages = new();
     private static readonly object _lock = new();
     private static string _inputBuffer = "";
-    private static int _cursorPos = 0; // posição do cursor dentro do buffer
+    private static int _cursorPos = 0;
+    private static int _scrollOffset = 0; // 0 = fim (mais recente), positivo = scrollado pra cima
     private const string Prompt = "> ";
     private const string Reset = "\x1b[0m";
 
@@ -24,10 +25,13 @@ public static class ConsoleUI
     {
         lock (_lock)
         {
-            // suporte a mensagens com múltiplas linhas (ex: ascii art)
             foreach (var line in raw.Split('\n'))
                 AddLine(line);
-            Redraw();
+            // só auto-scroll se já estava no fim
+            if (_scrollOffset == 0)
+                Redraw();
+            else
+                Redraw(); // redesenha mas mantém posição
         }
     }
 
@@ -60,7 +64,14 @@ public static class ConsoleUI
     {
         int msgHeight = MessageAreaHeight;
         int width = Math.Max(1, Console.WindowWidth - 1);
-        var visible = _messages.TakeLast(msgHeight).ToList();
+
+        // clamp scroll offset
+        int maxScroll = Math.Max(0, _messages.Count - msgHeight);
+        _scrollOffset = Math.Clamp(_scrollOffset, 0, maxScroll);
+
+        int startIdx = _messages.Count - msgHeight - _scrollOffset;
+        startIdx = Math.Max(0, startIdx);
+        var visible = _messages.Skip(startIdx).Take(msgHeight).ToList();
 
         Console.CursorVisible = false;
 
@@ -89,8 +100,11 @@ public static class ConsoleUI
             }
         }
 
+        // separador com indicador de scroll
         Console.SetCursorPosition(0, msgHeight);
-        Console.Write(new string('─', width));
+        string scrollInfo = _scrollOffset > 0 ? $" [↑ +{_scrollOffset} linhas] " : "";
+        string sep = new string('─', Math.Max(0, width - scrollInfo.Length));
+        Console.Write(sep + scrollInfo);
 
         Console.SetCursorPosition(0, msgHeight + 1);
         string inputLine = Prompt + _inputBuffer;
@@ -114,8 +128,17 @@ public static class ConsoleUI
                     string result = _inputBuffer;
                     _inputBuffer = "";
                     _cursorPos = 0;
+                    _scrollOffset = 0; // volta ao fim ao enviar
                     Redraw();
                     return result;
+                }
+                else if (key.Key == ConsoleKey.PageUp)
+                {
+                    _scrollOffset += MessageAreaHeight / 2;
+                }
+                else if (key.Key == ConsoleKey.PageDown)
+                {
+                    _scrollOffset = Math.Max(0, _scrollOffset - MessageAreaHeight / 2);
                 }
                 else if (key.Key == ConsoleKey.LeftArrow)
                 {

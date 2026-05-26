@@ -39,7 +39,7 @@ public static class AsciiArt
     {
         using var original = new Bitmap(path);
 
-        int width = Math.Min(Console.WindowWidth - 1, 120);
+        int width = Math.Min(Console.WindowWidth - 1, 60);
         // compensar proporção: chars são ~2x mais altos que largos
         int height = (int)(width * ((float)original.Height / original.Width) * 0.5f);
         height = Math.Max(1, height);
