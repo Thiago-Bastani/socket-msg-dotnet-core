@@ -60,8 +60,9 @@ public class SocketClient
             if (input == "sair") break;
             if (!string.IsNullOrEmpty(input))
             {
-                await SendAsync($"[{name}] - {input}");
-                ConsoleUI.AddMessage($"[{name}] - {input}");
+                string ascii = AsciiArt.TryConvert(input) is string art ? art : $"[{name}] - {input}";
+                await SendAsync(ascii);
+                ConsoleUI.AddMessage(ascii);
             }
         }
 

@@ -23,27 +23,34 @@ public static class ConsoleUI
     {
         lock (_lock)
         {
-            string? ansi = null;
-            var match = ColorTag.Match(raw);
-            if (match.Success)
-            {
-                string hex = match.Groups[1].Value;
-                int r = Convert.ToInt32(hex[..2], 16);
-                int g = Convert.ToInt32(hex[2..4], 16);
-                int b = Convert.ToInt32(hex[4..6], 16);
-                ansi = $"\x1b[38;2;{r};{g};{b}m";
-                raw = raw[..match.Index].TrimEnd();
-            }
-
-            int maxWidth = Math.Max(1, Console.WindowWidth - 1);
-            while (raw.Length > maxWidth)
-            {
-                _messages.Add(new(raw[..maxWidth], ansi));
-                raw = raw[maxWidth..];
-            }
-            _messages.Add(new(raw, ansi));
+            // suporte a mensagens com múltiplas linhas (ex: ascii art)
+            foreach (var line in raw.Split('\n'))
+                AddLine(line);
             Redraw();
         }
+    }
+
+    private static void AddLine(string raw)
+    {
+        string? ansi = null;
+        var match = ColorTag.Match(raw);
+        if (match.Success)
+        {
+            string hex = match.Groups[1].Value;
+            int r = Convert.ToInt32(hex[..2], 16);
+            int g = Convert.ToInt32(hex[2..4], 16);
+            int b = Convert.ToInt32(hex[4..6], 16);
+            ansi = $"\x1b[38;2;{r};{g};{b}m";
+            raw = raw[..match.Index].TrimEnd();
+        }
+
+        int maxWidth = Math.Max(1, Console.WindowWidth - 1);
+        while (raw.Length > maxWidth)
+        {
+            _messages.Add(new(raw[..maxWidth], ansi));
+            raw = raw[maxWidth..];
+        }
+        _messages.Add(new(raw, ansi));
     }
 
     private static int MessageAreaHeight => Math.Max(1, Console.WindowHeight - 2);
