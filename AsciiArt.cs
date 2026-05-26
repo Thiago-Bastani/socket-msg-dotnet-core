@@ -1,6 +1,9 @@
 using System.Drawing;
+using System.Runtime.Versioning;
 using System.Text;
 using System.Text.RegularExpressions;
+
+[SupportedOSPlatform("windows")]
 
 public static class AsciiArt
 {
@@ -49,7 +52,12 @@ public static class AsciiArt
             for (int x = 0; x < bmp.Width; x++)
             {
                 var p = bmp.GetPixel(x, y);
+
+                // pixel transparente → trata como branco (espaço no ASCII)
+                float alpha = p.A / 255f;
                 float brightness = (p.R * 0.299f + p.G * 0.587f + p.B * 0.114f) / 255f;
+                brightness = brightness * alpha + 1f * (1f - alpha);
+
                 int idx = Chars.Length - 1 - (int)(brightness * (Chars.Length - 1));
                 sb.Append(Chars[idx]);
             }

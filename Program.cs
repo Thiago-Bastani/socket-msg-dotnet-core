@@ -1,4 +1,7 @@
-﻿Console.WriteLine("=== Socket Pool ===");
+﻿using System.Runtime.Versioning;
+[assembly: SupportedOSPlatform("windows")]
+
+Console.WriteLine("=== Socket Pool ===");
 Console.Write("Seu nome: ");
 string nome = Console.ReadLine()!;
 

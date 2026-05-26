@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Net.NetworkInformation;
+using System.Runtime.Versioning;
 
 public class SocketServer
 {
@@ -53,16 +54,13 @@ public class SocketServer
     private async Task ReadLoop(TcpClient client)
     {
         var stream = client.GetStream();
-        var buffer = new byte[4096];
 
         try
         {
             while (client.Connected)
             {
-                int bytesRead = await stream.ReadAsync(buffer);
-                if (bytesRead == 0) break;
-
-                string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                string? message = await SocketFraming.ReadAsync(stream);
+                if (message == null) break;
                 MessageReceived?.Invoke(message);
             }
         }
@@ -77,14 +75,13 @@ public class SocketServer
 
     public async Task SendAsync(string message)
     {
-        var data = Encoding.UTF8.GetBytes(message);
         var dead = new List<TcpClient>();
 
         foreach (var client in _clients.ToList())
         {
             try
             {
-                await client.GetStream().WriteAsync(data);
+                await SocketFraming.WriteAsync(client.GetStream(), message);
             }
             catch
             {
@@ -96,6 +93,7 @@ public class SocketServer
             _clients.Remove(client);
     }
 
+    [SupportedOSPlatform("windows")]
     public async Task RunAsync(string name)
     {
         Start();
@@ -105,7 +103,9 @@ public class SocketServer
             if (input == "sair") break;
             if (!string.IsNullOrEmpty(input))
             {
-                string msg = AsciiArt.TryConvert(input) is string art ? art : $"[{name}] - {input}";
+                string msg = AsciiArt.TryConvert(input) is string art
+                    ? $"----- [{name}] -----\n{art}"
+                    : $"[{name}] - {input}";
                 await SendAsync(msg);
                 ConsoleUI.AddMessage(msg);
             }

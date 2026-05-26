@@ -6,6 +6,7 @@
     <RootNamespace>Socket_C_</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <SupportedOSPlatforms>windows</SupportedOSPlatforms>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,5 +1,6 @@
 using System.Net.Sockets;
 using System.Text;
+using System.Runtime.Versioning;
 
 public class SocketClient
 {
@@ -25,16 +26,13 @@ public class SocketClient
     private async Task ReadLoop()
     {
         var stream = _client.GetStream();
-        var buffer = new byte[4096];
 
         try
         {
             while (_running && _client.Connected)
             {
-                int bytesRead = await stream.ReadAsync(buffer);
-                if (bytesRead == 0) break;
-
-                string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                string? message = await SocketFraming.ReadAsync(stream);
+                if (message == null) break;
                 MessageReceived?.Invoke(message);
             }
         }
@@ -48,10 +46,10 @@ public class SocketClient
     public async Task SendAsync(string message)
     {
         if (!_client.Connected) return;
-        var data = Encoding.UTF8.GetBytes(message);
-        await _client.GetStream().WriteAsync(data);
+        await SocketFraming.WriteAsync(_client.GetStream(), message);
     }
 
+    [SupportedOSPlatform("windows")]
     public async Task RunAsync(string name)
     {
         while (true)
@@ -60,7 +58,9 @@ public class SocketClient
             if (input == "sair") break;
             if (!string.IsNullOrEmpty(input))
             {
-                string ascii = AsciiArt.TryConvert(input) is string art ? art : $"[{name}] - {input}";
+                string ascii = AsciiArt.TryConvert(input) is string art
+                    ? $"----- [{name}] -----\n{art}"
+                    : $"[{name}] - {input}";
                 await SendAsync(ascii);
                 ConsoleUI.AddMessage(ascii);
             }

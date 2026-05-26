@@ -7,6 +7,7 @@ public static class ConsoleUI
     private static readonly List<Message> _messages = new();
     private static readonly object _lock = new();
     private static string _inputBuffer = "";
+    private static int _cursorPos = 0; // posição do cursor dentro do buffer
     private const string Prompt = "> ";
     private const string Reset = "\x1b[0m";
 
@@ -96,7 +97,7 @@ public static class ConsoleUI
         if (inputLine.Length > width) inputLine = inputLine[..width];
         Console.Write(inputLine.PadRight(width));
 
-        int cursorX = Math.Min(Prompt.Length + _inputBuffer.Length, width);
+        int cursorX = Math.Min(Prompt.Length + _cursorPos, width);
         Console.SetCursorPosition(cursorX, msgHeight + 1);
         Console.CursorVisible = true;
     }
@@ -112,17 +113,43 @@ public static class ConsoleUI
                 {
                     string result = _inputBuffer;
                     _inputBuffer = "";
+                    _cursorPos = 0;
                     Redraw();
                     return result;
                 }
+                else if (key.Key == ConsoleKey.LeftArrow)
+                {
+                    if (_cursorPos > 0) _cursorPos--;
+                }
+                else if (key.Key == ConsoleKey.RightArrow)
+                {
+                    if (_cursorPos < _inputBuffer.Length) _cursorPos++;
+                }
+                else if (key.Key == ConsoleKey.Home)
+                {
+                    _cursorPos = 0;
+                }
+                else if (key.Key == ConsoleKey.End)
+                {
+                    _cursorPos = _inputBuffer.Length;
+                }
                 else if (key.Key == ConsoleKey.Backspace)
                 {
-                    if (_inputBuffer.Length > 0)
-                        _inputBuffer = _inputBuffer[..^1];
+                    if (_cursorPos > 0)
+                    {
+                        _inputBuffer = _inputBuffer[..(_cursorPos - 1)] + _inputBuffer[_cursorPos..];
+                        _cursorPos--;
+                    }
+                }
+                else if (key.Key == ConsoleKey.Delete)
+                {
+                    if (_cursorPos < _inputBuffer.Length)
+                        _inputBuffer = _inputBuffer[.._cursorPos] + _inputBuffer[(_cursorPos + 1)..];
                 }
                 else if (!char.IsControl(key.KeyChar))
                 {
-                    _inputBuffer += key.KeyChar;
+                    _inputBuffer = _inputBuffer[.._cursorPos] + key.KeyChar + _inputBuffer[_cursorPos..];
+                    _cursorPos++;
                 }
                 Redraw();
             }
