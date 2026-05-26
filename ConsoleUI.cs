@@ -1,9 +1,17 @@
+using System.Text.RegularExpressions;
+
 public static class ConsoleUI
 {
-    private static readonly List<string> _messages = new();
+    private record Message(string Text, string? AnsiColor);
+
+    private static readonly List<Message> _messages = new();
     private static readonly object _lock = new();
     private static string _inputBuffer = "";
     private const string Prompt = "> ";
+    private const string Reset = "\x1b[0m";
+
+    // detecta {#rrggbb} no final da mensagem
+    private static readonly Regex ColorTag = new(@"\{#([0-9a-fA-F]{6})\}\s*$");
 
     public static void Init()
     {
@@ -11,17 +19,29 @@ public static class ConsoleUI
         Redraw();
     }
 
-    public static void AddMessage(string message)
+    public static void AddMessage(string raw)
     {
         lock (_lock)
         {
-            int maxWidth = Math.Max(1, Console.WindowWidth - 1);
-            while (message.Length > maxWidth)
+            string? ansi = null;
+            var match = ColorTag.Match(raw);
+            if (match.Success)
             {
-                _messages.Add(message[..maxWidth]);
-                message = message[maxWidth..];
+                string hex = match.Groups[1].Value;
+                int r = Convert.ToInt32(hex[..2], 16);
+                int g = Convert.ToInt32(hex[2..4], 16);
+                int b = Convert.ToInt32(hex[4..6], 16);
+                ansi = $"\x1b[38;2;{r};{g};{b}m";
+                raw = raw[..match.Index].TrimEnd();
             }
-            _messages.Add(message);
+
+            int maxWidth = Math.Max(1, Console.WindowWidth - 1);
+            while (raw.Length > maxWidth)
+            {
+                _messages.Add(new(raw[..maxWidth], ansi));
+                raw = raw[maxWidth..];
+            }
+            _messages.Add(new(raw, ansi));
             Redraw();
         }
     }
@@ -39,9 +59,26 @@ public static class ConsoleUI
         for (int i = 0; i < msgHeight; i++)
         {
             Console.SetCursorPosition(0, i);
-            string line = i < visible.Count ? visible[i] : "";
-            if (line.Length > width) line = line[..width];
-            Console.Write(line.PadRight(width));
+            if (i < visible.Count)
+            {
+                string line = visible[i].Text;
+                if (line.Length > width) line = line[..width];
+                if (visible[i].AnsiColor is string color)
+                {
+                    Console.Write(color);
+                    Console.Write(line);
+                    Console.Write(Reset);
+                    Console.Write(new string(' ', width - line.Length));
+                }
+                else
+                {
+                    Console.Write(line.PadRight(width));
+                }
+            }
+            else
+            {
+                Console.Write(new string(' ', width));
+            }
         }
 
         Console.SetCursorPosition(0, msgHeight);
