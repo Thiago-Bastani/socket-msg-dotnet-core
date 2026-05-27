@@ -19,6 +19,26 @@ public static class ConsoleUI
     {
         Console.Clear();
         Redraw();
+        Task.Run(ResizeWatchLoop);
+    }
+
+    private static async Task ResizeWatchLoop()
+    {
+        int lastWidth = Console.WindowWidth;
+        int lastHeight = Console.WindowHeight;
+
+        while (true)
+        {
+            await Task.Delay(500);
+            int w = Console.WindowWidth;
+            int h = Console.WindowHeight;
+            if (w != lastWidth || h != lastHeight)
+            {
+                lastWidth = w;
+                lastHeight = h;
+                lock (_lock) { Console.Clear(); Redraw(); }
+            }
+        }
     }
 
     public static void AddMessage(string raw)
