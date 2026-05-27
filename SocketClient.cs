@@ -62,7 +62,6 @@ public class SocketClient
                     ? $"----- [{name}] -----\n{art}"
                     : $"[{name}] - {input}";
                 await SendAsync(ascii);
-                ConsoleUI.AddMessage(ascii);
             }
         }
 

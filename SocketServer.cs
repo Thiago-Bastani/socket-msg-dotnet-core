@@ -73,7 +73,7 @@ public class SocketServer
         }
     }
 
-    public async Task SendAsync(string message)
+    public async Task BroadcastAsync(string message)
     {
         var dead = new List<TcpClient>();
 
@@ -106,7 +106,7 @@ public class SocketServer
                 string msg = AsciiArt.TryConvert(input) is string art
                     ? $"----- [{name}] -----\n{art}"
                     : $"[{name}] - {input}";
-                await SendAsync(msg);
+                await BroadcastAsync(msg);
                 ConsoleUI.AddMessage(msg);
             }
         }

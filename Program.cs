@@ -16,7 +16,11 @@ if (opcao == "1")
     int porta = int.Parse(Console.ReadLine()!);
 
     var server = new SocketServer(porta);
-    server.MessageReceived += msg => ConsoleUI.AddMessage(msg);
+    server.MessageReceived += async msg =>
+    {
+        ConsoleUI.AddMessage(msg);
+        await server.BroadcastAsync(msg);
+    };
     ConsoleUI.Init();
     await server.RunAsync(nome);
 }
