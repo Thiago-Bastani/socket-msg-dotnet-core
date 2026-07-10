@@ -112,7 +112,10 @@ public class SocketServer
                     }
                     else
                     {
-                        ConsoleUI.AddMessage("[Grok] Pensando...");
+                        string questionMsg = $"[{name}] - /grok {question}";
+                        await BroadcastAsync(questionMsg);
+                        ConsoleUI.AddMessage(questionMsg);
+
                         string grokMsg = await GrokRequestHandler.HandleAsync(name, question);
                         await BroadcastAsync(grokMsg);
                         ConsoleUI.AddMessage(grokMsg);

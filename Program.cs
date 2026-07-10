@@ -25,6 +25,10 @@ if (opcao == "1")
     {
         if (GrokRequestCodec.TryDecode(msg, out string reqName, out string question))
         {
+            string questionMsg = $"[{reqName}] - /grok {question}";
+            ConsoleUI.AddMessage(questionMsg);
+            await server.BroadcastAsync(questionMsg);
+
             string grokMsg = await GrokRequestHandler.HandleAsync(reqName, question);
             ConsoleUI.AddMessage(grokMsg);
             await server.BroadcastAsync(grokMsg);
