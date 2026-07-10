@@ -103,6 +103,23 @@ public class SocketServer
             if (input == "sair") break;
             if (!string.IsNullOrEmpty(input))
             {
+                if (input.StartsWith("/grok", StringComparison.OrdinalIgnoreCase))
+                {
+                    string question = input.Length > 5 ? input[5..].Trim() : "";
+                    if (string.IsNullOrEmpty(question))
+                    {
+                        ConsoleUI.AddMessage("[Grok] Uso: /grok <pergunta>");
+                    }
+                    else
+                    {
+                        ConsoleUI.AddMessage("[Grok] Pensando...");
+                        string grokMsg = await GrokRequestHandler.HandleAsync(name, question);
+                        await BroadcastAsync(grokMsg);
+                        ConsoleUI.AddMessage(grokMsg);
+                    }
+                    continue;
+                }
+
                 string? path = AsciiArt.ExtractPath(input);
                 if (path != null && File.Exists(path) && AsciiArt.IsGif(path))
                 {

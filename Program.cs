@@ -15,9 +15,22 @@ if (opcao == "1")
     Console.Write("Porta: ");
     int porta = int.Parse(Console.ReadLine()!);
 
+    Console.Write("Chave da API do Grok (opcional, Enter para pular): ");
+    string? grokKey = Console.ReadLine();
+    if (!string.IsNullOrWhiteSpace(grokKey))
+        Environment.SetEnvironmentVariable("GROK_API_KEY", grokKey.Trim());
+
     var server = new SocketServer(porta);
     server.MessageReceived += async msg =>
     {
+        if (GrokRequestCodec.TryDecode(msg, out string reqName, out string question))
+        {
+            string grokMsg = await GrokRequestHandler.HandleAsync(reqName, question);
+            ConsoleUI.AddMessage(grokMsg);
+            await server.BroadcastAsync(grokMsg);
+            return;
+        }
+
         ConsoleUI.AddMessage(msg);
         await server.BroadcastAsync(msg);
     };
