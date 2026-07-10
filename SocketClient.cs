@@ -58,9 +58,24 @@ public class SocketClient
             if (input == "sair") break;
             if (!string.IsNullOrEmpty(input))
             {
+                string? path = AsciiArt.ExtractPath(input);
+                if (path != null && File.Exists(path) && AsciiArt.IsGif(path))
+                {
+                    try
+                    {
+                        var gif = AsciiArt.ConvertGif(path);
+                        await SendAsync(GifMessageCodec.Encode($"----- [{name}] -----", gif));
+                    }
+                    catch (Exception ex)
+                    {
+                        ConsoleUI.AddMessage($"[AsciiArt] Erro: {ex.Message}");
+                    }
+                    continue;
+                }
+
                 string ascii = AsciiArt.TryConvert(input) is string art
                     ? $"----- [{name}] -----\n{art}"
-                    : $"[{name}] - {input}";
+                    : ConsoleUI.ApplyPersistentColor($"[{name}] - {input}");
                 await SendAsync(ascii);
             }
         }

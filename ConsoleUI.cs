@@ -2,9 +2,18 @@ using System.Text.RegularExpressions;
 
 public static class ConsoleUI
 {
-    private record Message(string Text, string? AnsiColor);
+    private class Message
+    {
+        public string Text;
+        public string? AnsiColor;
+        public Message(string text, string? ansiColor) { Text = text; AnsiColor = ansiColor; }
+    }
+
+    private static readonly TimeSpan GifAnimationLifetime = TimeSpan.FromMinutes(2);
 
     private static readonly List<Message> _messages = new();
+    // rastreia animações de GIF em andamento e o horário em que foram recebidas, para encerrá-las após GifAnimationLifetime
+    private static readonly Dictionary<Guid, DateTime> _gifAnimations = new();
     private static readonly object _lock = new();
     private static string _inputBuffer = "";
     private static int _cursorPos = 0;
@@ -12,8 +21,37 @@ public static class ConsoleUI
     private const string Prompt = "> ";
     private const string Reset = "\x1b[0m";
 
+    // cor escolhida pelo usuário local (via {#rrggbb}), persistida para as próximas mensagens enviadas
+    private static string? _currentColorHex = null;
+
     // detecta {#rrggbb} no final da mensagem
     private static readonly Regex ColorTag = new(@"\{#([0-9a-fA-F]{6})\}\s*$");
+
+    /// <summary>
+    /// Se message já terminar com {#rrggbb}, salva essa cor como a cor atual do usuário local.
+    /// Caso contrário, se já houver uma cor salva, anexa a tag para manter a cor nas próximas mensagens.
+    /// </summary>
+    public static string ApplyPersistentColor(string message)
+    {
+        lock (_lock)
+        {
+            var match = ColorTag.Match(message.TrimEnd());
+            if (match.Success)
+            {
+                _currentColorHex = match.Groups[1].Value.ToLowerInvariant();
+                return message;
+            }
+            return _currentColorHex != null ? $"{message} {{#{_currentColorHex}}}" : message;
+        }
+    }
+
+    private static string BuildAnsiColor(string hex)
+    {
+        int r = Convert.ToInt32(hex[..2], 16);
+        int g = Convert.ToInt32(hex[2..4], 16);
+        int b = Convert.ToInt32(hex[4..6], 16);
+        return $"\x1b[38;2;{r};{g};{b}m";
+    }
 
     public static void Init()
     {
@@ -43,6 +81,12 @@ public static class ConsoleUI
 
     public static void AddMessage(string raw)
     {
+        if (GifMessageCodec.TryDecode(raw, out string header, out List<string[]> frames, out List<int> delaysMs))
+        {
+            AddGifAnimation(header, frames, delaysMs);
+            return;
+        }
+
         lock (_lock)
         {
             foreach (var line in raw.Split('\n'))
@@ -55,17 +99,58 @@ public static class ConsoleUI
         }
     }
 
+    private static void AddGifAnimation(string header, List<string[]> frames, List<int> delaysMs)
+    {
+        if (frames.Count == 0) return;
+
+        var id = Guid.NewGuid();
+        var frameMessages = new List<Message>(frames[0].Length);
+
+        lock (_lock)
+        {
+            AddLine(header);
+            foreach (var line in frames[0])
+            {
+                var msg = new Message(line, null);
+                frameMessages.Add(msg);
+                _messages.Add(msg);
+            }
+            _gifAnimations[id] = DateTime.UtcNow;
+            Redraw();
+        }
+
+        _ = Task.Run(async () =>
+        {
+            var start = _gifAnimations[id];
+            int frameIdx = 1;
+            while (DateTime.UtcNow - start < GifAnimationLifetime)
+            {
+                int delay = delaysMs[frameIdx % delaysMs.Count];
+                await Task.Delay(delay);
+
+                lock (_lock)
+                {
+                    if (!_gifAnimations.ContainsKey(id)) return;
+
+                    var frame = frames[frameIdx % frames.Count];
+                    for (int i = 0; i < frameMessages.Count; i++)
+                        frameMessages[i].Text = frame[i];
+                    Redraw();
+                }
+                frameIdx++;
+            }
+
+            lock (_lock) { _gifAnimations.Remove(id); }
+        });
+    }
+
     private static void AddLine(string raw)
     {
         string? ansi = null;
         var match = ColorTag.Match(raw);
         if (match.Success)
         {
-            string hex = match.Groups[1].Value;
-            int r = Convert.ToInt32(hex[..2], 16);
-            int g = Convert.ToInt32(hex[2..4], 16);
-            int b = Convert.ToInt32(hex[4..6], 16);
-            ansi = $"\x1b[38;2;{r};{g};{b}m";
+            ansi = BuildAnsiColor(match.Groups[1].Value);
             raw = raw[..match.Index].TrimEnd();
         }
 
@@ -127,11 +212,21 @@ public static class ConsoleUI
         Console.Write(sep + scrollInfo);
 
         Console.SetCursorPosition(0, msgHeight + 1);
-        string inputLine = Prompt + _inputBuffer;
-        if (inputLine.Length > width) inputLine = inputLine[..width];
-        Console.Write(inputLine.PadRight(width));
+        string colorIndicator = _currentColorHex != null ? $" ●#{_currentColorHex} " : "";
+        int usableWidth = Math.Max(0, width - colorIndicator.Length);
 
-        int cursorX = Math.Min(Prompt.Length + _cursorPos, width);
+        string inputLine = Prompt + _inputBuffer;
+        if (inputLine.Length > usableWidth) inputLine = inputLine[..usableWidth];
+        Console.Write(inputLine.PadRight(usableWidth));
+
+        if (colorIndicator.Length > 0)
+        {
+            Console.Write(BuildAnsiColor(_currentColorHex!));
+            Console.Write(colorIndicator);
+            Console.Write(Reset);
+        }
+
+        int cursorX = Math.Min(Prompt.Length + _cursorPos, usableWidth);
         Console.SetCursorPosition(cursorX, msgHeight + 1);
         Console.CursorVisible = true;
     }
